@@ -1,4 +1,4 @@
-# 🏛️ Bipartisanship Rates among Electoral Objector
+# 🏛️ Bipartisanship Rates Among Electoral Objectors
 
 This is the source code for checking whether there is any Republican-sponsored legislation from which members have withdrawn their support in the 117th Congress after the bill moved out of committee.
 
