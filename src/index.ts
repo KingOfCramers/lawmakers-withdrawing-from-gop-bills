@@ -4,7 +4,9 @@ import fs from "fs";
 import util from "util";
 
 const writer = util.promisify(fs.writeFile);
-const headless = false;
+const reader = util.promisify(fs.readFile);
+
+const headless = true;
 const executablePath = "/usr/local/bin/chromium";
 
 const getCosponsorshipLinks = async (page: Page) =>
@@ -19,16 +21,16 @@ const getCosponsorshipLinks = async (page: Page) =>
 
 const hasWithdrawnSponsors = async (page: Page) =>
   page.evaluate(() => {
-    return !!document.querySelector("TKTKTK"); // TK will write later, congress.gov is down at the moment.
+    return !!document.querySelector("a#withdrawnCosponsorsToggle"); // Check whether toggle exists
   });
 
-async function execute() {
+async function setup(done: boolean) {
+  if (done) return; // If file already written, skip this step
   const { browser } = await setupPuppeteer(headless, executablePath);
   const page = await browser.newPage();
 
   const pageNumbers = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]; // Goes up to 10, based on current data...
 
-  const results = [];
   const links = [];
 
   for await (const pageNumber of pageNumbers) {
@@ -46,14 +48,40 @@ async function execute() {
 
   console.log("Links written!");
 
-  for await (const link of links) {
-    page.goto(link);
-    if (await hasWithdrawnSponsors(page)) {
-      results.push(link);
-      console.log(link);
-    }
+  try {
+    await browser.close();
+  } catch (err) {
+    console.log(err);
+    console.log("DONE WRITING FILES!");
+  }
+}
+
+async function execute() {
+  const { browser } = await setupPuppeteer(headless, executablePath);
+  const page = await browser.newPage();
+
+  const results: string[] = [];
+  let links: string[];
+
+  try {
+    const linksString = await reader("./cosponsorLinks.json", {
+      encoding: "utf-8",
+    });
+    links = JSON.parse(linksString) as string[];
+  } catch (err) {
+    console.error("Could not read file");
+    console.error(err);
+    process.exit(1);
   }
 
+  console.log("Reading files...");
+  for await (const link of links) {
+    await page.goto(link);
+    if (await hasWithdrawnSponsors(page)) {
+      console.log(link);
+      results.push(link);
+    }
+  }
   await writer("./withdrawn.json", JSON.stringify(results, null, 2), "utf-8");
 
   try {
@@ -64,4 +92,4 @@ async function execute() {
   }
 }
 
-execute();
+setup().then(() => execute());
